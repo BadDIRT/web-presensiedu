@@ -53,6 +53,15 @@
                             </td>
                             <td class="px-4 py-2.5 text-right">
                                 <div class="flex items-center justify-end gap-1">
+                                    {{-- 🆕 Tombol Download Kartu PNG --}}
+                                    <a href="{{ route('admin.students.card', $s->id) }}" target="_blank"
+                                        class="btn-ghost btn-coc !p-2" title="Download Kartu Absensi (PNG)">
+                                        <svg class="w-4 h-4 text-[#38bdf8]" fill="none" stroke="currentColor"
+                                            stroke-width="2" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round"
+                                                d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                                        </svg>
+                                    </a>
                                     <button wire:click="openEditModal({{ $s->id }})"
                                         class="btn-ghost btn-coc !p-2" title="Edit">
                                         <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2"

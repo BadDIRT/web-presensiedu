@@ -24,6 +24,12 @@
             'label' => 'Rekap Harian',
             'icon' => '<path d="M9 17v-2m3 2v-4m3 4v-6M2 5l8-3 8 3M2 5v14l8 3 8-3V5M2 5h16"/>',
         ],
+        [
+            'route' => 'admin.games.index',
+            'label' => 'Game Kuis',
+            'icon' =>
+                '<path d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/><path stroke-linecap="round" stroke-linejoin="round" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>',
+        ],
     ];
 @endphp
 

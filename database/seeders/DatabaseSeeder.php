@@ -77,6 +77,11 @@ class DatabaseSeeder extends Seeder
                 'scanned_by' => $admin->id,
                 'keterangan' => 'Izin orang tua',
             ]);
+
+            // Di bagian akhir method run(), sebelum $this->command->info('Seed selesai.');
+            $this->call([
+                GameSeeder::class,
+            ]);
         }
 
         $this->command->info('Seed selesai.');
