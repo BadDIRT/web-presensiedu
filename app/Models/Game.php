@@ -75,6 +75,14 @@ class Game extends Model
     }
 
     /**
+     * Admin yang membuat game.
+     */
+    public function creator()
+    {
+        return $this->belongsTo(User::class, 'created_by');
+    }
+
+    /**
      * Update session state dengan timestamp.
      */
     public function setSession(string $status, ?int $nextActionInSeconds = null): void

@@ -19,6 +19,36 @@
             </div>
         </div>
 
+        {{-- Filter & Search --}}
+        <form method="GET" action="{{ route('admin.games.index') }}" class="coc-panel p-4 mb-4">
+            <div class="flex flex-wrap items-end gap-3">
+                <div>
+                    <label
+                        class="block text-[10px] uppercase tracking-widest text-slate-400 font-semibold mb-1">Cari</label>
+                    <input type="text" name="search" value="{{ $search }}" placeholder="🔍 Nama game..."
+                        class="coc-input !py-2 !w-auto min-w-[200px]">
+                </div>
+                <div>
+                    <label
+                        class="block text-[10px] uppercase tracking-widest text-slate-400 font-semibold mb-1">Status</label>
+                    <select name="status" class="coc-input !py-2 !w-auto">
+                        <option value="">Semua</option>
+                        <option value="draft" {{ $status === 'draft' ? 'selected' : '' }}>Draft</option>
+                        <option value="active" {{ $status === 'active' ? 'selected' : '' }}>Aktif</option>
+                        <option value="finished" {{ $status === 'finished' ? 'selected' : '' }}>Selesai</option>
+                    </select>
+                </div>
+                <button type="submit" class="btn-coc btn-gold">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round"
+                            d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                    </svg>
+                    Cari
+                </button>
+                <a href="{{ route('admin.games.index') }}" class="btn-coc btn-ghost">Reset</a>
+            </div>
+        </form>
+
         <div class="coc-panel overflow-hidden">
             <table class="w-full text-sm">
                 <thead>
@@ -35,7 +65,8 @@
                 <tbody>
                     @forelse ($games as $i => $g)
                         <tr class="border-b border-[rgba(42,55,102,0.4)] hover:bg-white/[0.03]">
-                            <td class="px-4 py-2.5 text-slate-500 text-xs">{{ $i + 1 }}</td>
+                            <td class="px-4 py-2.5 text-slate-500 text-xs">
+                                {{ ($games->currentPage() - 1) * $games->perPage() + $i + 1 }}</td>
                             <td class="px-4 py-2.5 font-semibold text-white">{{ $g->name }}</td>
                             <td class="px-4 py-2.5 text-slate-300">{{ $g->groups_count }} kelompok</td>
                             <td class="px-4 py-2.5 text-slate-300">{{ $g->questions_count }} soal</td>
@@ -71,12 +102,18 @@
                     @empty
                         <tr>
                             <td colspan="6" class="px-4 py-10 text-center text-slate-500">
-                                Belum ada game. Klik "Buat Game Baru" untuk memulai.
+                                {{ $search || $status ? 'Tidak ada game yang cocok dengan filter.' : 'Belum ada game. Klik "Buat Game Baru" untuk memulai.' }}
                             </td>
                         </tr>
                     @endforelse
                 </tbody>
             </table>
         </div>
+
+        @if ($games->hasPages())
+            <div class="mt-4">
+                {{ $games->links() }}
+            </div>
+        @endif
     </main>
 @endsection

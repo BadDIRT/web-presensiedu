@@ -4,28 +4,43 @@ namespace App\Http\Controllers;
 
 use App\Models\Game;
 use App\Models\GameGroup;
-use App\Models\GameHistory;
 use App\Models\GameQuestion;
+use App\Models\QuestionTemplate;
 use App\Models\Student;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\View\View;
-use App\Livewire\GameHost as GameHostComponent;
-use App\Livewire\GameLeaderboard as GameLeaderboardComponent;
-use App\Livewire\GamePlayer as GamePlayerComponent;
 
 class GameController extends Controller
 {
-    public function index(): View
+    public function index(Request $request): View
     {
-        $games = Game::withCount(['groups', 'questions'])->latest()->get();
-        return view('admin.games.index', compact('games'));
+        $search = $request->input('search', '');
+        $status = $request->input('status', '');
+
+        $games = Game::withCount(['groups', 'questions'])
+            ->with('creator')
+            ->when($search, function ($q) use ($search) {
+                $q->where('name', 'like', "%{$search}%");
+            })
+            ->when($status, function ($q) use ($status) {
+                $q->where('status', $status);
+            })
+            ->latest()
+            ->paginate(10);
+
+        $games->appends($request->query());
+
+        return view('admin.games.index', compact('games', 'search', 'status'));
     }
 
-    public function create(): View
+    public function create(Request $request): View
     {
         $students = Student::where('is_active', true)->orderBy('name')->get();
-        return view('admin.games.create', compact('students'));
+        $templates = QuestionTemplate::withCount('items')->latest()->get();
+        $selectedTemplate = $request->input('template');
+
+        return view('admin.games.create', compact('students', 'templates', 'selectedTemplate'));
     }
 
     public function store(Request $request)
@@ -91,12 +106,11 @@ class GameController extends Controller
     {
         $student = Auth::guard('siswa')->user();
 
-        // Game di mana siswa ini adalah leader dari salah satu group
         $activeGames = Game::whereHas('groups', function ($q) use ($student) {
             $q->where('leader_id', $student->id);
         })->whereIn('status', [Game::STATUS_ACTIVE, Game::STATUS_DRAFT])->latest()->get();
 
-        $pastGames = GameHistory::where('student_id', $student->id)
+        $pastGames = \App\Models\GameHistory::where('student_id', $student->id)
             ->latest('played_at')
             ->limit(20)
             ->get();
@@ -107,25 +121,9 @@ class GameController extends Controller
     public function siswaHistory(Game $game): View
     {
         $student = Auth::guard('siswa')->user();
-        $history = GameHistory::where('game_id', $game->id)
+        $history = \App\Models\GameHistory::where('game_id', $game->id)
             ->where('student_id', $student->id)
             ->first();
         return view('siswa.games.history', compact('game', 'history'));
-    }
-
-    // Tambah method ini di dalam class
-    public function host(Game $game): View
-    {
-        return view('admin.games.host', compact('game'));
-    }
-
-    public function leaderboard(Game $game): View
-    {
-        return view('admin.games.leaderboard', compact('game'));
-    }
-
-    public function play(Game $game): View
-    {
-        return view('siswa.games.play', compact('game'));
     }
 }

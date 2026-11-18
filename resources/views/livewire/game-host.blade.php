@@ -31,7 +31,7 @@
         @endforeach
     </div>
 
-    {{-- Soal saat ini --}}
+    {{-- Soal saat ini (TANPA kunci jawaban) --}}
     @if ($game->currentQuestion)
         <div class="coc-panel coc-corner p-6 mb-6">
             <div class="flex items-center justify-between mb-3">
@@ -40,8 +40,6 @@
                 <span class="text-xs text-slate-400">{{ $game->currentQuestion->points }} pts</span>
             </div>
             <div class="text-lg text-white font-semibold">{{ $game->currentQuestion->question_text }}</div>
-            <div class="mt-2 text-xs text-slate-500">Kunci: <span
-                    class="text-[#22e07b] font-mono">{{ $game->currentQuestion->answer_key }}</span></div>
         </div>
     @endif
 
@@ -73,14 +71,17 @@
                 <div class="text-sm text-slate-300">Menunggu jawaban dari leader...</div>
             </div>
         @elseif ($game->session_status === 'judging')
-            <div class="text-center py-6">
+            <div class="text-center py-6" x-data="{ countdown: 5 }" x-init="setInterval(() => { if (countdown > 0) countdown--; }, 1000)">
                 <div class="font-display text-2xl text-[#38bdf8] mb-3">⏳ MENILAI JAWABAN...</div>
                 @if ($game->currentAnswer)
                     <div class="coc-panel-flat p-3 mb-3 inline-block">
-                        <div class="text-[10px] uppercase text-slate-500">Jawaban Leader</div>
+                        <div class="text-[10px] uppercase text-slate-500">Jawaban dari {{ $game->buzzerGroup->name }}
+                        </div>
                         <div class="text-lg text-white font-mono">{{ $game->currentAnswer->answer_text }}</div>
                     </div>
                 @endif
+                <div class="text-xs text-slate-400 mt-3">Hasil dalam <span class="font-display text-[#ffcc33] text-xl"
+                        x-text="countdown">5</span> detik...</div>
             </div>
         @elseif ($game->session_status === 'result')
             <div class="text-center py-6">
@@ -90,8 +91,8 @@
                         {{ $game->buzzerGroup->name }}</div>
                 @else
                     <div class="font-display font-black text-4xl text-[#ff4757] mb-2">✗ SALAH!</div>
-                    <div class="text-sm text-slate-300">Jawaban: <span
-                            class="text-[#22e07b]">{{ $game->currentQuestion->answer_key }}</span></div>
+                    <div class="text-sm text-slate-300">Jawaban benar: <span
+                            class="text-[#22e07b] font-mono">{{ $game->currentQuestion->answer_key }}</span></div>
                 @endif
                 <div class="text-xs text-slate-400 mt-4">Lanjut ke soal berikutnya dalam
                     {{ $game->secondsUntilNextAction() }} detik...</div>
@@ -105,19 +106,22 @@
         @endif
     </div>
 
-    {{-- Hasil jawaban + efek visual --}}
-    <div x-show="showEffect" class="fixed inset-0 z-50 flex items-center justify-center pointer-events-none"
+    {{-- Overlay notif BENAR/SALAH (sama seperti leader) --}}
+    <div x-show="showOverlay" class="fixed inset-0 z-50 flex items-center justify-center pointer-events-none"
         x-transition.opacity>
-        <template x-if="effectType === 'correct'">
-            <div class="text-center">
-                <div class="text-9xl font-display font-black text-[#22e07b] text-glow-blue animate-bounce">✓</div>
-                <div class="text-4xl font-display font-black text-[#22e07b] mt-4">BENAR!</div>
+        <template x-if="overlayType === 'correct'">
+            <div class="text-center" style="animation: popIn 0.5s;">
+                <div
+                    class="text-[12rem] font-display font-black text-[#22e07b] text-glow-blue animate-bounce leading-none">
+                    ✓</div>
+                <div class="text-6xl font-display font-black text-[#22e07b] text-glow-blue mt-4">BENAR!</div>
+                <div class="text-xl text-[#ffcc33] font-display mt-3">🎂🎉</div>
             </div>
         </template>
-        <template x-if="effectType === 'wrong'">
+        <template x-if="overlayType === 'wrong'">
             <div class="text-center" style="animation: shake 0.5s;">
-                <div class="text-9xl font-display font-black text-[#ff4757] text-glow-red">✗</div>
-                <div class="text-4xl font-display font-black text-[#ff4757] mt-4">SALAH!</div>
+                <div class="text-[12rem] font-display font-black text-[#ff4757] text-glow-red leading-none">✗</div>
+                <div class="text-6xl font-display font-black text-[#ff4757] text-glow-red mt-4">SALAH!</div>
             </div>
         </template>
     </div>
@@ -129,94 +133,172 @@
         <script>
             function hostEffects() {
                 return {
-                    showEffect: false,
-                    effectType: '',
-                    init() {
-                        // listen event Livewire
-                        window.addEventListener('answer-judged', (e) => this.handleJudged(e.detail.correct));
-                    },
+                    showOverlay: false,
+                    overlayType: '',
+                    init() {},
                     handleJudged(correct) {
-                        // Hitung countdown 5 detik dulu sebelum tampil
-                        setTimeout(() => {
-                            this.effectType = correct ? 'correct' : 'wrong';
-                            this.showEffect = true;
+                        this.overlayType = correct ? 'correct' : 'wrong';
+                        this.showOverlay = true;
 
-                            // Play sound
-                            if (correct) this.playCorrectSound();
-                            else this.playWrongSound();
+                        if (correct) this.playBirthdayFanfare();
+                        else this.playWrongHeboh();
 
-                            // Confetti kalau benar
-                            if (correct) this.fireConfetti();
+                        if (correct) this.fireConfetti();
 
-                            // Sembunyikan setelah 3 detik
-                            setTimeout(() => this.showEffect = false, 3000);
-                        }, 5000); // 5 detik countdown dulu
+                        setTimeout(() => this.showOverlay = false, 4000);
                     },
-                    playCorrectSound() {
+                    playBirthdayFanfare() {
                         const ctx = new(window.AudioContext || window.webkitAudioContext)();
                         const now = ctx.currentTime;
-                        // C-E-G ascending chord
-                        [523.25, 659.25, 783.99, 1046.50].forEach((freq, i) => {
+
+                        // === 1. FANFARE TRUMPET (do-mi-sol-do) ===
+                        const notes = [523.25, 659.25, 783.99, 1046.50];
+                        for (let round = 0; round < 2; round++) {
+                            notes.forEach((freq, i) => {
+                                const startTime = now + round * 0.5 + i * 0.1;
+                                // 3 trumpet layer (sawtooth + slight detune)
+                                [0, 5, -5].forEach(detune => {
+                                    const osc = ctx.createOscillator();
+                                    const gain = ctx.createGain();
+                                    osc.connect(gain);
+                                    gain.connect(ctx.destination);
+                                    osc.type = 'sawtooth';
+                                    osc.frequency.value = freq * Math.pow(2, detune / 1200);
+                                    gain.gain.setValueAtTime(0, startTime);
+                                    gain.gain.linearRampToValueAtTime(0.18, startTime + 0.02);
+                                    gain.gain.exponentialRampToValueAtTime(0.001, startTime + 0.35);
+                                    osc.start(startTime);
+                                    osc.stop(startTime + 0.35);
+                                });
+                            });
+                        }
+
+                        // === 2. PARTY HORN / TEROMPET ULANG TAHUN (noise sweep) ===
+                        const noiseBuffer = ctx.createBuffer(1, ctx.sampleRate * 1.5, ctx.sampleRate);
+                        const data = noiseBuffer.getChannelData(0);
+                        for (let i = 0; i < data.length; i++) {
+                            data[i] = (Math.random() * 2 - 1) * Math.exp(-i / (ctx.sampleRate * 0.4));
+                        }
+                        const noise = ctx.createBufferSource();
+                        noise.buffer = noiseBuffer;
+                        const noiseFilter = ctx.createBiquadFilter();
+                        noiseFilter.type = 'bandpass';
+                        noiseFilter.frequency.setValueAtTime(800, now + 0.4);
+                        noiseFilter.frequency.linearRampToValueAtTime(2500, now + 1.2);
+                        noiseFilter.Q.value = 3;
+                        const noiseGain = ctx.createGain();
+                        noiseGain.gain.setValueAtTime(0, now + 0.4);
+                        noiseGain.gain.linearRampToValueAtTime(0.4, now + 0.45);
+                        noiseGain.gain.exponentialRampToValueAtTime(0.001, now + 1.9);
+                        noise.connect(noiseFilter);
+                        noiseFilter.connect(noiseGain);
+                        noiseGain.connect(ctx.destination);
+                        noise.start(now + 0.4);
+
+                        // === 3. WHISTLES (cheer effect) ===
+                        for (let w = 0; w < 4; w++) {
+                            const ws = ctx.createOscillator();
+                            const wg = ctx.createGain();
+                            ws.connect(wg);
+                            wg.connect(ctx.destination);
+                            ws.type = 'sine';
+                            const startFreq = 1800 + w * 300;
+                            ws.frequency.setValueAtTime(startFreq, now + 1.5 + w * 0.1);
+                            ws.frequency.linearRampToValueAtTime(startFreq + 800, now + 1.9 + w * 0.1);
+                            wg.gain.setValueAtTime(0, now + 1.5 + w * 0.1);
+                            wg.gain.linearRampToValueAtTime(0.12, now + 1.55 + w * 0.1);
+                            wg.gain.exponentialRampToValueAtTime(0.001, now + 2.0 + w * 0.1);
+                            ws.start(now + 1.5 + w * 0.1);
+                            ws.stop(now + 2.0 + w * 0.1);
+                        }
+
+                        // === 4. FINAL "YAY!" CHORD ===
+                        [523.25, 659.25, 783.99].forEach(freq => {
                             const osc = ctx.createOscillator();
                             const gain = ctx.createGain();
                             osc.connect(gain);
                             gain.connect(ctx.destination);
+                            osc.type = 'triangle';
                             osc.frequency.value = freq;
-                            osc.type = 'sine';
-                            gain.gain.setValueAtTime(0, now + i * 0.08);
-                            gain.gain.linearRampToValueAtTime(0.3, now + i * 0.08 + 0.04);
-                            gain.gain.exponentialRampToValueAtTime(0.001, now + i * 0.08 + 0.7);
-                            osc.start(now + i * 0.08);
-                            osc.stop(now + i * 0.08 + 0.7);
+                            gain.gain.setValueAtTime(0, now + 2.0);
+                            gain.gain.linearRampToValueAtTime(0.2, now + 2.05);
+                            gain.gain.exponentialRampToValueAtTime(0.001, now + 3.0);
+                            osc.start(now + 2.0);
+                            osc.stop(now + 3.0);
                         });
                     },
-                    playWrongSound() {
+                    playWrongHeboh() {
                         const ctx = new(window.AudioContext || window.webkitAudioContext)();
                         const now = ctx.currentTime;
-                        // Buzz descending
-                        const osc = ctx.createOscillator();
-                        const gain = ctx.createGain();
-                        osc.connect(gain);
-                        gain.connect(ctx.destination);
-                        osc.type = 'sawtooth';
-                        osc.frequency.setValueAtTime(220, now);
-                        osc.frequency.exponentialRampToValueAtTime(80, now + 0.8);
-                        gain.gain.setValueAtTime(0.3, now);
-                        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.8);
-                        osc.start(now);
-                        osc.stop(now + 0.8);
-                        // Tambahan "tettt" beep kedua
+
+                        // === "Wah wah wah" trombone effect ===
+                        const notes = [466.16, 415.30, 369.99, 311.13];
+                        notes.forEach((freq, i) => {
+                            const startTime = now + i * 0.18;
+                            const osc = ctx.createOscillator();
+                            const gain = ctx.createGain();
+                            osc.connect(gain);
+                            gain.connect(ctx.destination);
+                            osc.type = 'sawtooth';
+                            osc.frequency.setValueAtTime(freq, startTime);
+                            osc.frequency.linearRampToValueAtTime(freq * 0.95, startTime + 0.15);
+                            gain.gain.setValueAtTime(0, startTime);
+                            gain.gain.linearRampToValueAtTime(0.3, startTime + 0.02);
+                            gain.gain.exponentialRampToValueAtTime(0.001, startTime + 0.16);
+                            osc.start(startTime);
+                            osc.stop(startTime + 0.16);
+                        });
+
+                        // === Buzzer bass ===
+                        const buzz = ctx.createOscillator();
+                        const buzzGain = ctx.createGain();
+                        buzz.connect(buzzGain);
+                        buzzGain.connect(ctx.destination);
+                        buzz.type = 'square';
+                        buzz.frequency.setValueAtTime(120, now);
+                        buzz.frequency.linearRampToValueAtTime(80, now + 1.0);
+                        buzzGain.gain.setValueAtTime(0.15, now);
+                        buzzGain.gain.exponentialRampToValueAtTime(0.001, now + 1.0);
+                        buzz.start(now);
+                        buzz.stop(now + 1.0);
+
+                        // === "TETTTT" alarm beep ===
                         setTimeout(() => {
-                            const o2 = ctx.createOscillator();
-                            const g2 = ctx.createGain();
-                            o2.connect(g2);
-                            g2.connect(ctx.destination);
-                            o2.type = 'square';
-                            o2.frequency.value = 200;
-                            g2.gain.setValueAtTime(0.25, ctx.currentTime);
-                            g2.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.4);
-                            o2.start();
-                            o2.stop(ctx.currentTime + 0.4);
-                        }, 300);
+                            for (let i = 0; i < 3; i++) {
+                                const o2 = ctx.createOscillator();
+                                const g2 = ctx.createGain();
+                                o2.connect(g2);
+                                g2.connect(ctx.destination);
+                                o2.type = 'square';
+                                o2.frequency.value = 220;
+                                const t = ctx.currentTime + i * 0.15;
+                                g2.gain.setValueAtTime(0.3, t);
+                                g2.gain.exponentialRampToValueAtTime(0.001, t + 0.1);
+                                o2.start(t);
+                                o2.stop(t + 0.1);
+                            }
+                        }, 500);
                     },
                     fireConfetti() {
-                        const colors = ['#ffcc33', '#ff4757', '#38bdf8', '#22e07b', '#a855f7'];
+                        const colors = ['#ffcc33', '#ff4757', '#38bdf8', '#22e07b', '#a855f7', '#ff9d2e'];
                         const container = document.getElementById('confetti');
-                        for (let i = 0; i < 80; i++) {
+                        for (let i = 0; i < 150; i++) {
                             const c = document.createElement('div');
+                            const size = 6 + Math.random() * 14;
                             c.style.cssText = `
                         position: absolute;
                         left: ${Math.random() * 100}%;
                         top: -20px;
-                        width: ${5 + Math.random() * 10}px;
-                        height: ${5 + Math.random() * 10}px;
+                        width: ${size}px;
+                        height: ${size * 1.5}px;
                         background: ${colors[Math.floor(Math.random() * colors.length)]};
                         opacity: 0.9;
                         transform: rotate(${Math.random() * 360}deg);
-                        animation: confetti-fall ${1.5 + Math.random() * 1}s linear forwards;
+                        animation: confetti-fall ${1.5 + Math.random() * 1.5}s linear forwards;
+                        border-radius: 2px;
                     `;
                             container.appendChild(c);
-                            setTimeout(() => c.remove(), 3000);
+                            setTimeout(() => c.remove(), 3500);
                         }
                     }
                 };
@@ -238,19 +320,36 @@
                 }
 
                 20% {
-                    transform: translateX(-10px);
+                    transform: translateX(-15px);
                 }
 
                 40% {
-                    transform: translateX(10px);
+                    transform: translateX(15px);
                 }
 
                 60% {
-                    transform: translateX(-10px);
+                    transform: translateX(-15px);
                 }
 
                 80% {
-                    transform: translateX(10px);
+                    transform: translateX(15px);
+                }
+            }
+
+            @keyframes popIn {
+                0% {
+                    transform: scale(0);
+                    opacity: 0;
+                }
+
+                50% {
+                    transform: scale(1.2);
+                    opacity: 1;
+                }
+
+                100% {
+                    transform: scale(1);
+                    opacity: 1;
                 }
             }
         </style>

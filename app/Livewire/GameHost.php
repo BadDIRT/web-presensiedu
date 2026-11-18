@@ -7,22 +7,34 @@ use App\Models\GameAnswer;
 use App\Models\GameGroup;
 use App\Models\GameHistory;
 use App\Models\GameQuestion;
-use Illuminate\Support\Facades\Auth;
+use Livewire\Attributes\Layout;
 use Livewire\Component;
 
+#[Layout('layouts.app')]
 class GameHost extends Component
 {
     public Game $game;
+    public ?string $previousStatus = null;
 
     public function mount(Game $game)
     {
         $this->game = $game;
+        $this->previousStatus = $game->session_status;
     }
 
     public function refreshState(): void
     {
         $this->game->refresh();
 
+        // Detect transisi judging → result → dispatch event ke browser
+        $currentStatus = $this->game->session_status;
+        if ($this->previousStatus === Game::SS_JUDGING && $currentStatus === Game::SS_RESULT) {
+            $isCorrect = $this->game->currentAnswer?->is_correct ?? false;
+            $this->dispatch('answer-judged', correct: $isCorrect);
+        }
+        $this->previousStatus = $currentStatus;
+
+        // Auto-advance kalau next_action_at sudah lewat
         if ($this->game->next_action_at && now()->gte($this->game->next_action_at)) {
             $this->autoAdvance();
         }
@@ -68,12 +80,14 @@ class GameHost extends Component
         $this->game->current_answer_id = null;
         $this->game->save();
         $this->game->setSession(Game::SS_QUESTION_REVEALED);
+        $this->previousStatus = Game::SS_QUESTION_REVEALED;
     }
 
     public function openBuzzer(): void
     {
         if ($this->game->session_status !== Game::SS_QUESTION_REVEALED) return;
         $this->game->setSession(Game::SS_BUZZER_OPEN);
+        $this->previousStatus = Game::SS_BUZZER_OPEN;
     }
 
     public function buzz(int $groupId): void
@@ -93,31 +107,31 @@ class GameHost extends Component
         $this->game->current_answer_id = $answer->id;
         $this->game->save();
         $this->game->setSession(Game::SS_BUZZER_WON);
+        $this->previousStatus = Game::SS_BUZZER_WON;
     }
 
-    public function receiveAnswer(int $answerId, string $text): void
+    /**
+     * Auto-judge setelah delay 5 detik (dipanggil dari polling saat next_action_at lewat).
+     */
+    public function autoJudge(): void
     {
-        $answer = GameAnswer::findOrFail($answerId);
-        $answer->answer_text = trim($text);
-        $answer->answered_at = now();
-        $answer->save();
+        if (! $this->game->current_answer_id) {
+            $this->game->setSession(Game::SS_RESULT, 10);
+            $this->previousStatus = Game::SS_RESULT;  // ← TAMBAH INI
+            return;
+        }
 
-        $this->game->current_answer_id = $answer->id;
-        $this->game->save();
-        $this->game->setSession(Game::SS_JUDGING);
-
-        $this->judgeAnswer($answer->id, true);
-    }
-
-    public function judgeAnswer(int $answerId, bool $autoMatch = false): void
-    {
-        $answer = GameAnswer::with('question')->findOrFail($answerId);
-        if ($answer->judged_at) return;
+        $answer = GameAnswer::with('question')->find($this->game->current_answer_id);
+        if (! $answer || $answer->judged_at) {
+            $this->game->setSession(Game::SS_RESULT, 10);
+            $this->previousStatus = Game::SS_RESULT;  // ← TAMBAH INI
+            return;
+        }
 
         $userAnswer = mb_strtolower(trim($answer->answer_text ?? ''));
         $key = mb_strtolower(trim($answer->question->answer_key));
 
-        $isCorrect = ($userAnswer === $key) || ($autoMatch && str_contains($userAnswer, $key));
+        $isCorrect = ($userAnswer === $key) || str_contains($userAnswer, $key);
 
         $answer->is_correct = $isCorrect;
         $answer->judged_at = now();
@@ -130,6 +144,7 @@ class GameHost extends Component
         }
 
         $this->game->setSession(Game::SS_RESULT, 10);
+        $this->previousStatus = Game::SS_RESULT;  // ← TAMBAH INI (PENTING!)
         $this->dispatch('answer-judged', correct: $isCorrect, groupId: $answer->group_id);
     }
 
@@ -148,6 +163,7 @@ class GameHost extends Component
         $answer->judged_at = now();
         $answer->save();
         $this->game->setSession(Game::SS_RESULT, 10);
+        $this->previousStatus = Game::SS_RESULT;  // ← TAMBAH INI
         $this->dispatch('answer-judged', correct: true, groupId: $answer->group_id);
     }
 
@@ -166,6 +182,7 @@ class GameHost extends Component
         $answer->judged_at = now();
         $answer->save();
         $this->game->setSession(Game::SS_RESULT, 10);
+        $this->previousStatus = Game::SS_RESULT;  // ← TAMBAH INI
         $this->dispatch('answer-judged', correct: false, groupId: $answer->group_id);
     }
 
@@ -175,6 +192,7 @@ class GameHost extends Component
         $this->game->current_answer_id = null;
         $this->game->save();
         $this->game->setSession(Game::SS_BUZZER_OPEN);
+        $this->previousStatus = Game::SS_BUZZER_OPEN;
     }
 
     public function autoAdvance(): void
@@ -182,7 +200,7 @@ class GameHost extends Component
         if ($this->game->session_status === Game::SS_RESULT) {
             $this->revealNextQuestion();
         } elseif ($this->game->session_status === Game::SS_JUDGING) {
-            $this->game->setSession(Game::SS_RESULT, 10);
+            $this->autoJudge();
         }
     }
 

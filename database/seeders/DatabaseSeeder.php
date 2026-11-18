@@ -81,6 +81,7 @@ class DatabaseSeeder extends Seeder
             // Di bagian akhir method run(), sebelum $this->command->info('Seed selesai.');
             $this->call([
                 GameSeeder::class,
+                QuestionTemplateSeeder::class,
             ]);
         }
 

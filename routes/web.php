@@ -1,15 +1,16 @@
 <?php
 
-use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\AdminController;
+use App\Http\Controllers\Auth\LoginController;
+use App\Http\Controllers\GameController;
+use App\Http\Controllers\QuestionTemplateController;
 use App\Http\Controllers\SiswaController;
 use App\Http\Controllers\StudentController;
-use Illuminate\Support\Facades\Route;
-use App\Http\Controllers\GameController;
 use App\Livewire\GameHost;
+use App\Livewire\GameLeaderboard;
 use App\Livewire\GameManager;
 use App\Livewire\GamePlayer;
-use App\Livewire\GameLeaderboard;
+use Illuminate\Support\Facades\Route;
 
 Route::get('/', fn() => redirect()->route('login'))->name('home');
 
@@ -46,6 +47,11 @@ Route::middleware(['auth:web', 'role:admin'])
         // Sesudah:
         Route::get('/games/{game}/host', [GameController::class, 'host'])->name('games.host');
         Route::get('/games/{game}/leaderboard', [GameController::class, 'leaderboard'])->name('games.leaderboard');
+
+        // Di dalam group admin
+        Route::get('/templates',                [QuestionTemplateController::class, 'index'])->name('templates.index');
+        Route::get('/templates/{template}',     [QuestionTemplateController::class, 'show'])->name('templates.show');
+        Route::delete('/templates/{template}',  [QuestionTemplateController::class, 'destroy'])->name('templates.destroy');
     });
 
 // ===== SISWA (guard siswa + role siswa) =====
